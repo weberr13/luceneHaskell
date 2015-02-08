@@ -35,7 +35,7 @@ doesMatch rss@(r:rs) = case r of
 
 findMatch :: Matcher -> String ->  [Regex]
 findMatch (Sequence pattern) matchedString =
-   go ( []) pattern matchedString
+   go [] pattern matchedString
 
    where
 
@@ -44,7 +44,7 @@ findMatch (Sequence pattern) matchedString =
    buildMatch = (. return) . Match . Sequence . return
 
    addNewMatch :: [Regex] -> String -> String ->  [Regex]
-   addNewMatch rs (p:ps) (s:ss) = go ( (rs ++ [buildMatch p s] )) ss ps
+   addNewMatch rs (p:ps) (s:ss) = go ( (rs ++ [buildMatch p s] )) ps ss
 
 
    addToUnmatched :: [Regex] -> String -> String ->  [Regex]
@@ -53,6 +53,19 @@ findMatch (Sequence pattern) matchedString =
 
    go :: [Regex] -> String -> String ->  [Regex]
    -- first
+   go [] [p] [s] = if s == p
+
+     then return (buildMatch p s)
+     else return (Unmatched [s])
+
+   go [] (p:ps) [s] =
+     return (Unmatched [s])
+
+   go [] [p] (s:ss) = if s == p
+
+       then [buildMatch p s] ++ [Unmatched ss]
+       else go ([Unmatched [s]]) pattern ss
+
    go [] (p:ps) (s:ss)  = if s == p
 
      then go ( [buildMatch p s]) ps ss
@@ -62,58 +75,72 @@ findMatch (Sequence pattern) matchedString =
 
      Unmatched us -> if s == p
        then begin [Match (Sequence [p]) [s]]
-       else begin [Unmatched [s]]
+       else begin [Unmatched $ us ++ [s]]
 
      Match (Sequence up) us -> if s == p
        then begin [Match (Sequence $ up ++ [p]) $ us ++ [s]]
        else begin [Unmatched $ us ++ [s]]
 
-   go rs (ps) [s] = case last rs of
+   go rs pp@[p] sss@(s:ss) = let begin = (init rs ++) in case last rs of
 
-     Unmatched us ->          init rs ++ [Unmatched $ us ++ [s]]
-     Match (Sequence _) us -> init rs ++ [Unmatched $ us ++ [s]]
+    Unmatched us -> if s == p
+      then rs ++ [buildMatch p s] ++ [Unmatched ss]
+      else go (begin [Unmatched $ us ++ [s]]) pattern ss
 
-   go rs pp@[p] sss@(s:ss) = case last rs of
+    Match (Sequence up) us -> if s == p
+      then begin [Match (Sequence $ up ++ [p]) (us ++ [s])]
+                ++ [Unmatched ss]
+      else addToUnmatched rs sss us
 
-     Unmatched us -> if s == p
-       then addNewMatch    rs pp sss
-       else addToUnmatched rs sss us
+   go rs (ps) [s] = let begin = (init rs ++) in case last rs of
 
-     Match (Sequence up) us -> if s == p
-       then init rs
-         ++ [Match (Sequence $ up ++ [p]) (us ++ [s])]
-         ++ [Unmatched ss]
-       else addToUnmatched rs sss us
+     Unmatched us ->          begin [Unmatched $ us ++ [s]]
+     Match (Sequence _) us -> begin [Unmatched $ us ++ [s]]
 
-   go rs pp@(p:ps) sss@(s:ss) = case last rs of
+
+   go rs pp@(p:ps) sss@(s:ss) = let begin = (init rs ++) in case last rs of
 
      Unmatched us -> if s == p
        then addNewMatch rs pp sss
-       else go ( init rs ++ [Unmatched (us ++ [s])] ) pattern ss
+       else go ( begin [Unmatched (us ++ [s])] ) pattern ss
 
      Match (Sequence up) us -> if s == p
-       then go (init rs ++ [Match (Sequence $ up ++ [p]) $ us ++ [s]]) ps ss
-       else go (init rs ++ [Unmatched [s]] ) pattern ss
+       then go (begin [Match (Sequence $ up ++ [p]) $ us ++ [s]]) ps ss
+       else go (begin [Unmatched [s]] ) pattern ss
 
----- doesMatch :: [] Matchers -> (String -> [] Regex)
--- doesMatch :: [Matcher] -> String -> [Regex]
--- doesMatch matchers astring = foldr go [] matchers
---
---    where
---    go :: Matcher -> [Regex] -> [Regex]
---    go (Sequence seq) regexes =
---      if
----- Sequence foo
----- go Dot regexes =
 
 main :: IO ()
 main = do
+  print "f =~ /foo/ "
+  print $ findMatch (Sequence "foo") "f"
+  print $ doesMatch $ findMatch (Sequence "foo") "f"
+  print "fo =~ /foo/"
+  print $ findMatch (Sequence "foo") "fo"
+  print $ doesMatch $ findMatch (Sequence "foo") "fo"
+  print "foobar =~ /foo/"
   print $ findMatch (Sequence "foo") "foobar"
-  print $ findMatch (Sequence "foo") "barfoo"
   print $ doesMatch $ findMatch (Sequence "foo") "foobar"
+  print "foobar =~ /f/"
+  print $ findMatch (Sequence "f") "foobar"
+  print $ doesMatch $ findMatch (Sequence "f") "foobar"
+  print "f =~ /f/"
+  print $ findMatch (Sequence "f") "f"
+  print $ doesMatch $ findMatch (Sequence "f") "f"
+  print "b =~ /f/"
+  print $ findMatch (Sequence "f") "b"
+  print $ doesMatch $ findMatch (Sequence "f") "b"
+  print "barfoo =~ /foo/"
+  print $ findMatch (Sequence "foo") "barfoo"
   print $ doesMatch $ findMatch (Sequence "foo") "barfoo"
+  print "nobar =~ /foo/"
   print $ findMatch (Sequence "foo") "nobar"
   print $ doesMatch $ findMatch (Sequence "foo") "nobar"
+  print "foobar =~ /z/"
+  print $ findMatch (Sequence "z") "foobar"
+  print $ doesMatch $ findMatch (Sequence "z") "foobar"
+  print "foobar =~ /b/"
+  print $ findMatch (Sequence "b") "foobar"
+  print $ doesMatch $ findMatch (Sequence "b") "foobar"
 
 
 --main = getThing "foo" >>= \f ->
