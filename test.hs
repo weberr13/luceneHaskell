@@ -40,61 +40,60 @@ findMatch (Sequence pattern) matchedString =
    where
 
    buildMatch :: Char -> Char -> Regex
-   buildMatch a b = Match (Sequence [a]) [b]
+  --  buildMatch a b = Match (Sequence [a]) [b]
+   buildMatch = (. return) . Match . Sequence . return
 
    addNewMatch :: [Regex] -> String -> String ->  [Regex]
    addNewMatch rs (p:ps) (s:ss) = go ( (rs ++ [buildMatch p s] )) ss ps
 
+
    addToUnmatched :: [Regex] -> String -> String ->  [Regex]
-   addToUnmatched rs (s:ss) us = go ( init rs ++ [Unmatched $ us ++ [s]]) pattern ss
+   addToUnmatched rs (s:ss) us = go (init rs ++ [Unmatched $ us ++ [s]]) pattern ss
 
 
    go :: [Regex] -> String -> String ->  [Regex]
    -- first
-   go ( []) (p:ps) (s:ss)  =
-     if s == p then go ( [buildMatch p s]) ps ss
+   go [] (p:ps) (s:ss)  = if s == p
+
+     then go ( [buildMatch p s]) ps ss
      else go ([Unmatched [s]]) pattern ss
-   go ( rs) [p] [s] = case last rs of
-     Unmatched us ->
-       if s == p then
-         init rs ++ [Match (Sequence [p]) [s]]
-       else
-         init rs ++ [Unmatched [s]]
-     Match (Sequence up) us ->
-       if s == p then
-         init rs ++ [Match (Sequence $ up ++ [p]) $ us ++ [s]]
-       else
-         init rs ++ [Unmatched $ us ++ [s]]
-   go ( rs) (ps) [s] = case last rs of
-     Unmatched us ->
-        init rs ++ [Unmatched $ us ++ [s]]
-     Match (Sequence _) us ->
-        init rs ++ [Unmatched $ us ++ [s]]
-   go ( rs) pp@[p] sss@(s:ss) = case last rs of
-     Unmatched us ->
-       if s == p then
-          addNewMatch rs pp sss
-       else
-          addToUnmatched rs sss us
-     Match (Sequence up) us ->
-       if s == p
+
+   go rs [p] [s] = let begin = (init rs ++) in case last rs of
+
+     Unmatched us -> if s == p
+       then begin [Match (Sequence [p]) [s]]
+       else begin [Unmatched [s]]
+
+     Match (Sequence up) us -> if s == p
+       then begin [Match (Sequence $ up ++ [p]) $ us ++ [s]]
+       else begin [Unmatched $ us ++ [s]]
+
+   go rs (ps) [s] = case last rs of
+
+     Unmatched us ->          init rs ++ [Unmatched $ us ++ [s]]
+     Match (Sequence _) us -> init rs ++ [Unmatched $ us ++ [s]]
+
+   go rs pp@[p] sss@(s:ss) = case last rs of
+
+     Unmatched us -> if s == p
+       then addNewMatch    rs pp sss
+       else addToUnmatched rs sss us
+
+     Match (Sequence up) us -> if s == p
        then init rs
          ++ [Match (Sequence $ up ++ [p]) (us ++ [s])]
          ++ [Unmatched ss]
-       else
-         addToUnmatched rs sss us
+       else addToUnmatched rs sss us
 
    go rs pp@(p:ps) sss@(s:ss) = case last rs of
-     Unmatched us ->
-       if s == p then addNewMatch rs pp sss
-       else
-         go ( init rs ++ [Unmatched (us ++ [s])] ) pattern ss
-     Match (Sequence up) us ->
-       if s == p then
-         go (init rs
-           ++ [Match (Sequence $ up ++ [p]) $ us ++ [s]]) ps ss
-       else
-         go (init rs ++ [Unmatched [s]] ) pattern ss
+
+     Unmatched us -> if s == p
+       then addNewMatch rs pp sss
+       else go ( init rs ++ [Unmatched (us ++ [s])] ) pattern ss
+
+     Match (Sequence up) us -> if s == p
+       then go (init rs ++ [Match (Sequence $ up ++ [p]) $ us ++ [s]]) ps ss
+       else go (init rs ++ [Unmatched [s]] ) pattern ss
 
 ---- doesMatch :: [] Matchers -> (String -> [] Regex)
 -- doesMatch :: [Matcher] -> String -> [Regex]
